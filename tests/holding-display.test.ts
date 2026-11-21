@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {holdingDisplayGroups,priceTimeLabel} from '../src/lib/holding-display';
+import {assetName} from '../src/lib/labels';
+import {marketValue} from '../src/lib/portfolio';
+import type {Position} from '../src/types/portfolio';
+const p:Position={id:'a',accountId:'a',category:'A股 / ETF',symbol:'159501',name:'纳指 ETF 嘉实',currency:'CNY',quantity:100,price:2,previousClose:2,averageCost:1,provider:'auto',quoteAt:null,quoteSource:'',quoteError:null};
+const rows=[p,{...p,id:'b',symbol:'159659',name:'纳斯达克100 ETF 招商',quantity:200},{...p,id:'c',symbol:'513650',name:'标普500 ETF 南方'},{...p,id:'d',accountId:'other',symbol:'VOO',name:'Vanguard S&P 500 ETF',category:'美股' as const,currency:'USD' as const},{...p,id:'gold',symbol:'518850',name:'黄金 ETF 华夏'}];
+const original=JSON.stringify(rows),groups=holdingDisplayGroups(rows);
+assert.deepEqual(groups.map(g=>g.name),['Nasdaq 100','S&P 500','Gold']);
+assert.equal(groups[0].positions.length,2);assert.equal(groups[1].positions.length,2);
+assert.equal(groups.flatMap(g=>g.positions).reduce((n,p)=>n+marketValue(p,{CNY:1,USD:7,HKD:.9}),0),rows.reduce((n,p)=>n+marketValue(p,{CNY:1,USD:7,HKD:.9}),0));
+assert.equal(JSON.stringify(rows),original,'display grouping must preserve each original position');
+assert.equal(assetName(rows[3]),'S&P 500');assert.equal(assetName(rows[4]),'Gold');
+console.log('Display grouping checks passed: distinct indices, cross-account funds, FX totals and unchanged records');
+assert.equal(holdingDisplayGroups([{...p,quantity:0}]).length,0,'zero-quantity positions remain stored but are hidden');
+const withClosed=holdingDisplayGroups([...rows,{...p,id:'closed',quantity:0}]);
+assert.equal(withClosed[0].positions.length,2,'closed member must not appear in grouped details');
+
+const recorded={...p,quoteAt:'2026-11-20T02:10:00Z'};
+assert.equal(priceTimeLabel({...recorded,quoteSource:'腾讯 · 20261119150000'}),'Market time · 2026-11-19 15:00');
+assert.equal(priceTimeLabel({...recorded,quoteSource:'腾讯 · 2026-11-18 16:00:00',quoteError:'offline'}),'Market time · 2026-11-18 16:00');
+assert.equal(priceTimeLabel({...recorded,quoteSource:'CoinLore · USD/24h · response time'}),'Source response · 2026-11-20 10:10 UTC+8');
+assert.equal(priceTimeLabel({...recorded,quoteSource:'手动价格'}),'Entered · 2026-11-20 10:10 UTC+8');
+assert.equal(priceTimeLabel(p),'Price time unknown');
+assert.equal(priceTimeLabel({...recorded,category:'现金'}),'');

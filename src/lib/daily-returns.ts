@@ -1,0 +1,1 @@
+export interface DailyReturn {date:string;opening:number|null;closing:number|null;value:number|null;items?:{name:string;symbol:string;currency:string;openingPrice:number|null;closingPrice:number;value:number}[]}

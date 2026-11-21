@@ -1,0 +1,42 @@
+node_modules/
+.next/
+.next-*/
+.env*
+!.env.example
+*.tsbuildinfo
+data/*.sqlite*
+data/backups/
+.next-production/
+.next-test/
+.vercel/
+deployment-access.txt
+
+# Private ledger files, migration inputs, and local notes
+data/
+MEMORY.md
+scripts/prepare-current-holdings.ts
+preview.png
+
+# Unrelated document exports and temporary files
+output/
+tmp/
+.DS_Store
+*.log
+supabase/.temp/
+supabase/.branches/
+.vercel
+
+# Account credentials, sessions and private provisioning inputs
+*users*.private.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.session.json
+.auth/
+playwright/.auth/
+verification/

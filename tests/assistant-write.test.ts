@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {emptyState} from '../src/lib/portfolio';
+import {readState,saveState} from '../src/server/storage';
+import {writeAssistantTools} from '../src/server/assistant-write';
+import {chatMessages} from '../src/server/assistant';
+const dir=mkdtempSync(join(tmpdir(),'assistant-writes-'));process.env.PORTFOLIO_DATA_DIR=dir;process.env.PORTFOLIO_STORAGE='local';
+async function main(){
+ const state=emptyState();state.accounts=[{id:'a',name:'test',note:''}];
+ const stock={id:'p',symbol:'TEST',name:'test',category:'美股' as const,accountId:'a',currency:'USD' as const,quantity:1,price:10,previousClose:10,averageCost:10,provider:'manual' as const,quoteAt:null,quoteSource:'',quoteError:null};
+ state.positions=[stock,{...stock,id:'cash',symbol:'USD',category:'现金',quantity:100,price:1,previousClose:1,averageCost:1}];state.settings.rates.USD=7;
+ const saved=await saveState(state,0,false,undefined,[],'owner_a');
+ const tools=writeAssistantTools(saved,'owner_a','request-1');
+ const input={operation:{action:'trade',positionId:'p',type:'买入',quantity:2,price:10,fee:1,settleCash:true,timestamp:new Date().toISOString()},itemKey:'first',reference:'ORDER-1',reason:'已成交截图'};
+ const execute=async(x:unknown)=>tools.updateLedger.execute!(x as never,{} as never);
+ await execute(input);
+ let result=await readState('owner_a');assert.equal(result.positions.find(p=>p.id==='p')?.quantity,3);assert.equal(result.positions.find(p=>p.id==='cash')?.quantity,79);
+ const retry=writeAssistantTools(result,'owner_a','different-request');await retry.updateLedger.execute!(input,{} as never);
+ result=await readState('owner_a');assert.equal(result.positions.find(p=>p.id==='p')?.quantity,3,'same order must not be booked twice');
+ assert.equal((await readState('owner_b')).positions.length,0,'owner isolation');
+ await assert.rejects(()=>execute({...input,reference:'another',operation:{action:'delete-position',id:'p'}}));
+ const conflicting=structuredClone(result);conflicting.settings.refreshSeconds=300;await saveState(conflicting,result.revision,false,undefined,[],'owner_a');
+ await assert.rejects(()=>execute({...input,reference:'ORDER-2'}),'stale revision cannot overwrite newer edits');
+ const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=';
+ const message=chatMessages([{role:'user',parts:[{type:'file',mediaType:'image/png',url:png}]}]);assert.ok(Array.isArray(message[0].content));
+ assert.throws(()=>chatMessages([{role:'user',parts:[{type:'file',url:'http://127.0.0.1/secret'}]}]));
+ assert.throws(()=>chatMessages([{role:'user',parts:[{type:'file',url:'data:image/png;base64,YmFk'}]}]));
+ console.log('Assistant write checks passed: trade/cash, duplicate order, owners, forbidden operations, conflicts, images and remote URL rejection');
+}
+main().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>rmSync(dir,{recursive:true,force:true}));

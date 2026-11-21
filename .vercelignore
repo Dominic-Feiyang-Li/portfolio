@@ -1,0 +1,12 @@
+node_modules
+.next*
+.git
+.env*
+data
+tests
+scripts/*
+!scripts/cloud-smoke.mjs
+MEMORY.md
+*.command
+*.tsbuildinfo
+deployment-access.txt

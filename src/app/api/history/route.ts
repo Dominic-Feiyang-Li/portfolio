@@ -1,0 +1,5 @@
+import {readHistory,exportHistory} from '@/server/storage';
+import {checkOrigin,respond,failure} from '@/server/http';
+import {InputError} from '@/server/validation';
+export const runtime='nodejs';export const dynamic='force-dynamic';
+export async function GET(req:Request){try{const user=await checkOrigin(req);const url=new URL(req.url);if(url.searchParams.get('download')==='1')return new Response(JSON.stringify({version:1,exportedAt:new Date().toISOString(),records:await exportHistory(user?.id)},null,2),{headers:{'Content-Type':'application/json','Content-Disposition':'attachment; filename="portfolio-history.json"','Cache-Control':'no-store'}});const raw=url.searchParams.get('cursor'),cursor=raw?Number(raw):undefined;if(cursor!==undefined&&(!Number.isSafeInteger(cursor)||cursor<1))throw new InputError('分页参数不正确');const scope=url.searchParams.get('scope')||'all';if(!['all','trades'].includes(scope))throw new InputError('筛选参数不正确');return respond(await readHistory(cursor,scope,user?.id))}catch(e){return failure(e)}}
